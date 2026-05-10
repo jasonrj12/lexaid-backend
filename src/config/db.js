@@ -18,10 +18,14 @@ const pool = new Pool({
 pool.connect((err, client, release) => {
   if (err) {
     console.error('❌ Database connection error:', err.message);
-    console.error('   Tip: if using Render + Supabase, use the Supabase Pooler URL (IPv4)');
-    console.error('   Project Settings → Database → Connection pooling → Session mode');
+    console.error('   Code:', err.code);
+    console.error('   Stack:', err.stack);
+    console.error('\n💡 Troubleshooting Tip:');
+    console.error('   - If error is ENETUNREACH, ensure src/server.js has ipv4first DNS setting.');
+    console.error('   - Check if your IP is whitelisted in Supabase (0.0.0.0/0 for Render).');
+    console.error('   - Verify DATABASE_URL is set correctly in Render Dashboard.');
   } else {
-    console.log('✅ Database connected');
+    console.log('✅ Database connected successfully to Supabase');
     release();
   }
 });
