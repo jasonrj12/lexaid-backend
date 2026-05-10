@@ -39,7 +39,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 // Explicitly handle preflight for all routes
-app.options('*', cors(corsOptions));
+app.options('/{*path}', cors(corsOptions));
 
 
 // ── Rate limiting ─────────────────────────────────────────────

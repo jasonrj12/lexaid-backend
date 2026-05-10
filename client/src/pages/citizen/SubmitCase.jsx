@@ -93,7 +93,6 @@ export default function SubmitCase() {
       const res = await axios.post(`${API}/cases`, fd, {
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
         },
       });
       toast.success(`Case submitted! Reference: ${res.data.case?.ref}`);

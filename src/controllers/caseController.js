@@ -14,15 +14,22 @@ async function generateRef() {
 // ── GET /api/cases/my ──────────────────────────────────────────
 async function getMyCases(req, res) {
   try {
-    const result = await pool.query(
-      `SELECT c.id, c.ref, c.title, c.category, c.status, c.created_at, c.updated_at,
-              u.full_name AS lawyer_name
-       FROM cases c
-       LEFT JOIN users u ON u.id = c.lawyer_id
-       WHERE c.citizen_id = $1
-       ORDER BY c.created_at DESC`,
-      [req.user.id]
-    );
+    const isLawyer = req.user.role === 'lawyer';
+    const query = isLawyer 
+      ? `SELECT c.id, c.ref, c.title, c.category, c.status, c.created_at, c.updated_at,
+                u.full_name AS citizen_name
+         FROM cases c
+         JOIN users u ON u.id = c.citizen_id
+         WHERE c.lawyer_id = $1
+         ORDER BY c.updated_at DESC`
+      : `SELECT c.id, c.ref, c.title, c.category, c.status, c.created_at, c.updated_at,
+                u.full_name AS lawyer_name
+         FROM cases c
+         LEFT JOIN users u ON u.id = c.lawyer_id
+         WHERE c.citizen_id = $1
+         ORDER BY c.created_at DESC`;
+
+    const result = await pool.query(query, [req.user.id]);
     res.json({ cases: result.rows });
   } catch (err) {
     res.status(500).json({ message: 'Could not fetch cases' });
@@ -77,6 +84,17 @@ async function createCase(req, res) {
       [ref, req.user.id, category, title, description, sla_deadline]
     );
     const newCase = result.rows[0];
+
+    // Handle uploaded documents
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        await client.query(
+          `INSERT INTO case_documents (case_id, filename, storage_key, mime_type, size_bytes, uploaded_by)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [newCase.id, file.originalname, file.filename, file.mimetype, file.size, req.user.id]
+        );
+      }
+    }
 
     // Create in-app notification for citizen
     await client.query(

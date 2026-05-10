@@ -109,15 +109,19 @@ router.post(
   '/simplify',
   authenticate,
   [
-    body('text').trim().notEmpty().isLength({ min: 20, max: 10000 }),
-    body('lang').optional().isIn(['en', 'si', 'ta']),
+    body('text').trim().notEmpty().isLength({ min: 1, max: 10000 }),
+    body('lang').optional().trim(),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ message: errors.array()[0].msg });
 
-    const { text, lang = 'en' } = req.body;
-    const langName = { en: 'English', si: 'Sinhala', ta: 'Tamil' }[lang] || 'English';
+    let { text, lang = 'en' } = req.body;
+    // Normalize lang (e.g. 'en-US' -> 'en')
+    lang = String(lang).slice(0, 2).toLowerCase();
+    if (!['en', 'si', 'ta'].includes(lang)) lang = 'en';
+
+    const langName = { en: 'English', si: 'Sinhala', ta: 'Tamil' }[lang];
 
     const system = `You are a plain-language simplification assistant for LexAid, a Sri Lankan legal aid platform.
 Your task is to rewrite the following legal guidance in simple, clear, everyday ${langName} that a person with no legal background can understand.

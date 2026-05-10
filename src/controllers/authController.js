@@ -3,6 +3,13 @@ const jwt       = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const pool      = require('../config/db');
 const crypto    = require('crypto');
+const { sendSMS } = require('../services/sms');
+
+// ── In-memory OTP store ───────────────────────────────────────
+// Map<normalizedPhone, { otp, expiresAt, attempts }>
+const otpStore = new Map();
+const OTP_TTL_MS     = 10 * 60 * 1000;  // 10 minutes
+const OTP_MAX_TRIES  = 5;
 
 // ── NIC format validation ─────────────────────────────────────
 const NIC_REGEX = /^(\d{9}[VXvx]|\d{12})$/;
@@ -36,6 +43,14 @@ function signToken(user) {
   );
 }
 
+// ── Normalize +94 phone ───────────────────────────────────────
+function normalizePhone(raw) {
+  let p = (raw || '').replace(/\s+/g, '');
+  if (p.startsWith('0'))       p = '+94' + p.slice(1);
+  else if (!p.startsWith('+')) p = '+94' + p;
+  return p;
+}
+
 // ── REGISTER ──────────────────────────────────────────────────
 const registerValidation = [
   body('full_name').trim().notEmpty().isLength({ min: 2, max: 200 }),
@@ -43,7 +58,17 @@ const registerValidation = [
   body('password').isLength({ min: 8 }),
   body('nic').matches(NIC_REGEX).withMessage('Invalid NIC format'),
   body('role').isIn(['citizen', 'lawyer']),
-  body('phone').optional().trim(),
+  body('phone')
+    .notEmpty().withMessage('Phone number is required')
+    .trim()
+    .custom((val) => {
+      // Accept 10-digit local number (07XXXXXXXX) or full +94 format
+      const digits = val.replace(/[\s+]/g, '').replace(/^94/, '');
+      if (!/^0?\d{9}$/.test(digits) && !/^\+94\d{9}$/.test(val.replace(/\s/g,''))) {
+        throw new Error('Phone must be a valid Sri Lankan 10-digit number (07XXXXXXXX)');
+      }
+      return true;
+    }),
   body('slba_number').if(body('role').equals('lawyer')).notEmpty().withMessage('SLBA number required for lawyers'),
 ];
 
@@ -114,6 +139,91 @@ async function register(req, res) {
   }
 }
 
+// ── SEND OTP ──────────────────────────────────────────────────
+const sendOtpValidation = [
+  body('phone')
+    .notEmpty().withMessage('Phone number is required')
+    .trim()
+    .custom((val) => {
+      const clean = val.replace(/[\s+]/g, '');
+      // Allow 07XXXXXXXX (10 digits) or already-normalised 94XXXXXXXXX (11 digits)
+      if (!/^(0\d{9}|94\d{9})$/.test(clean)) {
+        throw new Error('Enter a valid 10-digit Sri Lankan phone number (e.g. 0771234567)');
+      }
+      return true;
+    }),
+];
+
+async function sendOtp(req, res) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ message: errors.array()[0].msg });
+  }
+
+  const phone = normalizePhone(req.body.phone);
+
+  // Rate-limit: prevent spam — max 1 OTP every 60 s for same number
+  const existing = otpStore.get(phone);
+  if (existing && (Date.now() < existing.expiresAt - OTP_TTL_MS + 60_000)) {
+    return res.status(429).json({ message: 'Please wait 60 seconds before requesting a new OTP.' });
+  }
+
+  const otp = String(Math.floor(100000 + Math.random() * 900000)); // 6-digit
+  otpStore.set(phone, { otp, expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 });
+
+  const smsResult = await sendSMS(phone, `LexAid: Your verification code is ${otp}. Valid for 10 minutes. Do not share this code.`);
+
+  if (!smsResult.success) {
+    // If SMS disabled/failed in dev, still return success but log otp for testing
+    console.warn('[OTP] SMS not delivered — OTP for testing:', otp, '| reason:', smsResult.reason || smsResult.error);
+  }
+
+  res.json({
+    success: true,
+    message: 'OTP sent to your phone number.',
+    // Only expose OTP in non-production when SMS is disabled (dev convenience)
+    ...(process.env.NODE_ENV !== 'production' && !smsResult.success ? { dev_otp: otp } : {}),
+  });
+}
+
+// ── VERIFY OTP ────────────────────────────────────────────────
+const verifyOtpValidation = [
+  body('phone').notEmpty().trim(),
+  body('otp').isLength({ min: 6, max: 6 }).isNumeric().withMessage('OTP must be 6 digits'),
+];
+
+async function verifyOtp(req, res) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ message: errors.array()[0].msg });
+  }
+
+  const phone = normalizePhone(req.body.phone);
+  const { otp } = req.body;
+
+  const record = otpStore.get(phone);
+  if (!record) {
+    return res.status(400).json({ message: 'No OTP found for this number. Please request a new one.' });
+  }
+  if (Date.now() > record.expiresAt) {
+    otpStore.delete(phone);
+    return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
+  }
+  if (record.attempts >= OTP_MAX_TRIES) {
+    otpStore.delete(phone);
+    return res.status(400).json({ message: 'Too many failed attempts. Please request a new OTP.' });
+  }
+
+  if (record.otp !== otp) {
+    record.attempts += 1;
+    return res.status(400).json({ message: `Incorrect OTP. ${OTP_MAX_TRIES - record.attempts} attempt(s) remaining.` });
+  }
+
+  // Mark as verified — keep in store briefly so registration can consume it
+  record.verified = true;
+  res.json({ success: true, message: 'Phone number verified successfully.' });
+}
+
 // ── LOGIN ─────────────────────────────────────────────────────
 const loginValidation = [
   body('email').isEmail().normalizeEmail(),
@@ -175,4 +285,4 @@ async function me(req, res) {
   }
 }
 
-module.exports = { register, registerValidation, login, loginValidation, me };
+module.exports = { register, registerValidation, login, loginValidation, me, sendOtp, sendOtpValidation, verifyOtp, verifyOtpValidation };

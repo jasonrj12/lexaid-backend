@@ -13,6 +13,7 @@ import LawyerDash     from './pages/lawyer/LawyerDashboard';
 import OpenCases      from './pages/lawyer/OpenCases';
 import LawyerCaseDetail from './pages/lawyer/LawyerCaseDetail';
 import AdminDash      from './pages/admin/AdminDashboard';
+import AdminCaseDetail from './pages/admin/AdminCaseDetail';
 import LibraryPage    from './pages/library/LibraryPage';
 import ArticlePage    from './pages/library/ArticlePage';
 import NotFound       from './pages/NotFound';
@@ -23,7 +24,7 @@ function RequireAuth({ children, roles }) {
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 rounded-full border-4 border-brand-500 border-t-transparent animate-spin" />
+        <div className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: 'rgba(252,163,17,0.3)', borderTopColor: '#FCA311' }} />
         <p className="text-gray-400 text-sm">Loading…</p>
       </div>
     </div>
@@ -51,13 +52,14 @@ export default function App() {
           position="top-right"
           toastOptions={{
             style: {
-              background: '#1a1a2e',
-              color: '#e5e7eb',
-              border: '1px solid rgba(255,255,255,0.1)',
+              background: '#14213D',
+              color: '#f5f5f5',
+              border: '1px solid rgba(252,163,17,0.25)',
               borderRadius: '12px',
               fontSize: '14px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.50)',
             },
-            success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+            success: { iconTheme: { primary: '#FCA311', secondary: '#000' } },
             error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
           }}
         />
@@ -82,6 +84,7 @@ export default function App() {
           <Route path="/lawyer/cases/:id"   element={<RequireAuth roles={['lawyer']}><LawyerCaseDetail /></RequireAuth>} />
 
           {/* Admin */}
+          <Route path="/admin/cases/:id"    element={<RequireAuth roles={['admin']}><AdminCaseDetail /></RequireAuth>} />
           <Route path="/admin"              element={<RequireAuth roles={['admin']}><AdminDash /></RequireAuth>} />
           <Route path="/admin/:section"     element={<RequireAuth roles={['admin']}><AdminDash /></RequireAuth>} />
 

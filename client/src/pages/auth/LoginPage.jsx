@@ -4,14 +4,16 @@ import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
-import { Scale, Eye, EyeOff, ArrowRight, Lock, Mail } from 'lucide-react';
+import { Scale, Eye, EyeOff, ArrowRight, Lock, Mail, CheckCircle2 } from 'lucide-react';
 import LanguageSwitcher from '../../components/layout/LanguageSwitcher';
+
+const FEATURES = ['NIC-Verified Identity', 'SLBA-Verified Lawyers', 'Encrypted & Secure', 'Free of Charge'];
 
 export default function LoginPage() {
   const { t } = useTranslation();
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [showPw, setShowPw] = useState(false);
+  const [showPw, setShowPw]   = useState(false);
   const [loading, setLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm();
@@ -31,16 +33,35 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left decorative panel */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-surface-900 via-surface-800 to-surface-900 items-center justify-center">
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-brand-600/20 rounded-full blur-3xl animate-pulse-slow" />
-          <div className="absolute bottom-1/3 right-1/4 w-56 h-56 bg-purple-600/15 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '2s' }} />
+    <div className="min-h-screen flex" style={{ background: '#000000' }}>
+
+      {/* ── Left decorative panel ── */}
+      <div
+        className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center"
+        style={{ background: 'linear-gradient(135deg, #000000 0%, #14213D 60%, #000000 100%)' }}
+      >
+        {/* Orbs */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-72 h-72 rounded-full blur-3xl animate-pulse-slow"
+            style={{ background: 'rgba(252,163,17,0.12)' }} />
+          <div className="absolute bottom-1/3 right-1/4 w-56 h-56 rounded-full blur-3xl animate-pulse-slow"
+            style={{ background: 'rgba(20,33,61,0.70)', animationDelay: '2s' }} />
         </div>
+
+        {/* Grid overlay */}
+        <div className="absolute inset-0 pointer-events-none opacity-20"
+          style={{
+            backgroundImage: 'linear-gradient(rgba(252,163,17,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(252,163,17,0.06) 1px, transparent 1px)',
+            backgroundSize: '60px 60px',
+          }}
+        />
+
         <div className="relative z-10 text-center px-12">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-brand-900/50 animate-float">
-            <Scale className="w-10 h-10 text-white" />
+          <div
+            className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 animate-float"
+            style={{ background: 'linear-gradient(135deg, #FCA311, #e5920f)', boxShadow: '0 12px 40px rgba(252,163,17,0.35)' }}
+          >
+            <Scale className="w-10 h-10 text-black" />
           </div>
           <h1 className="font-display text-4xl font-bold text-white mb-3">
             Lex<span className="text-gradient">Aid</span>
@@ -48,11 +69,18 @@ export default function LoginPage() {
           <p className="text-gray-400 text-base leading-relaxed max-w-sm">
             Multilingual legal guidance for Sri Lankan citizens — in Sinhala, Tamil, and English.
           </p>
-          <div className="mt-10 flex flex-col gap-3 text-left">
-            {['NIC-Verified Identity', 'SLBA-Verified Lawyers', 'Encrypted & Secure', 'Free of Charge'].map(f => (
+
+          {/* Amber divider */}
+          <div className="amber-line w-24 mx-auto my-8" />
+
+          <div className="flex flex-col gap-3 text-left">
+            {FEATURES.map(f => (
               <div key={f} className="flex items-center gap-3 text-sm text-gray-300">
-                <div className="w-5 h-5 rounded-full bg-accent-500/20 border border-accent-500/40 flex items-center justify-center flex-shrink-0">
-                  <div className="w-2 h-2 rounded-full bg-accent-500" />
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(252,163,17,0.15)', border: '1px solid rgba(252,163,17,0.40)' }}
+                >
+                  <CheckCircle2 className="w-3 h-3" style={{ color: '#FCA311' }} />
                 </div>
                 {f}
               </div>
@@ -61,13 +89,18 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center px-4 sm:px-8 py-12">
+      {/* ── Right form panel ── */}
+      <div
+        className="flex-1 flex items-center justify-center px-4 sm:px-8 py-12 overflow-y-auto"
+        style={{ background: '#000000' }}
+      >
         <div className="w-full max-w-md">
+
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center">
-              <Scale className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #FCA311, #e5920f)' }}>
+              <Scale className="w-4 h-4 text-black" />
             </div>
             <span className="font-display font-bold text-xl text-white">Lex<span className="text-gradient">Aid</span></span>
           </div>
@@ -83,7 +116,10 @@ export default function LoginPage() {
           <form id="login-form" onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
             {/* Email */}
             <div className="form-group">
-              <label className="label" htmlFor="login-email"><Mail className="w-3 h-3 inline mr-1" />{t('auth.email')}</label>
+              <label className="label" htmlFor="login-email">
+                <Mail className="w-3 h-3 inline mr-1" style={{ color: '#FCA311' }} />
+                {t('auth.email')}
+              </label>
               <input
                 id="login-email"
                 type="email"
@@ -96,7 +132,10 @@ export default function LoginPage() {
 
             {/* Password */}
             <div className="form-group">
-              <label className="label" htmlFor="login-password"><Lock className="w-3 h-3 inline mr-1" />{t('auth.password')}</label>
+              <label className="label" htmlFor="login-password">
+                <Lock className="w-3 h-3 inline mr-1" style={{ color: '#FCA311' }} />
+                {t('auth.password')}
+              </label>
               <div className="relative">
                 <input
                   id="login-password"
@@ -125,7 +164,8 @@ export default function LoginPage() {
             >
               {loading ? (
                 <span className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 rounded-full animate-spin"
+                    style={{ borderColor: 'rgba(0,0,0,0.30)', borderTopColor: '#000' }} />
                   Signing in…
                 </span>
               ) : (
@@ -136,14 +176,19 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-gray-500 mt-6">
             {t('auth.no_account')}{' '}
-            <Link to="/register" id="login-register-link" className="text-brand-400 hover:text-brand-300 font-medium transition-colors">
+            <Link to="/register" id="login-register-link" className="font-medium transition-colors hover:underline" style={{ color: '#FCA311' }}>
               {t('nav.register')}
             </Link>
           </p>
 
           {/* Demo accounts notice */}
-          <div className="mt-8 p-4 rounded-xl bg-surface-700/50 border border-white/8">
-            <p className="text-xs text-gray-500 font-semibold mb-2 uppercase tracking-wide">Demo Accounts</p>
+          <div
+            className="mt-8 p-4 rounded-xl"
+            style={{ background: 'rgba(20,33,61,0.60)', border: '1px solid rgba(252,163,17,0.15)' }}
+          >
+            <p className="text-xs text-gray-500 font-semibold mb-3 uppercase tracking-wide" style={{ color: '#FCA311' }}>
+              Demo Accounts
+            </p>
             <div className="grid grid-cols-3 gap-2 text-xs">
               {[
                 { role: 'Citizen', email: 'citizen@demo.com' },
@@ -151,8 +196,8 @@ export default function LoginPage() {
                 { role: 'Admin',   email: 'admin@demo.com' },
               ].map(d => (
                 <div key={d.role} className="flex flex-col gap-0.5">
-                  <span className="text-gray-400 font-medium">{d.role}</span>
-                  <span className="text-gray-600 truncate">{d.email}</span>
+                  <span className="text-gray-300 font-medium">{d.role}</span>
+                  <span className="text-gray-500 truncate">{d.email}</span>
                   <span className="text-gray-600">pw: demo1234</span>
                 </div>
               ))}

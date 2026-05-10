@@ -11,6 +11,8 @@ import {
   Briefcase, ShoppingBag, Heart, Gavel, FileText
 } from 'lucide-react';
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 const CATEGORY_ICONS = {
   land: Landmark, labour: Briefcase, consumer: ShoppingBag,
   family: Heart, criminal: Gavel, other: FileText,
@@ -33,26 +35,33 @@ const MOCK_CASES = [
 ];
 
 const MOCK_STATS = [
-  { label: 'Total Cases',    value: '3', icon: FolderOpen,    color: 'text-brand-400',  bg: 'bg-brand-500/10' },
-  { label: 'In Progress',    value: '1', icon: Clock,         color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
-  { label: 'Resolved',       value: '0', icon: CheckCircle2,  color: 'text-accent-400', bg: 'bg-accent-500/10' },
-  { label: 'Unread Messages',value: '2', icon: MessageSquare, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+  { label: 'Total Cases',     value: '3', icon: FolderOpen,    color: '#FCA311',  bg: 'rgba(252,163,17,0.12)' },
+  { label: 'In Progress',     value: '1', icon: Clock,         color: '#fbbf24',  bg: 'rgba(251,191,36,0.12)' },
+  { label: 'Resolved',        value: '0', icon: CheckCircle2,  color: '#86efac',  bg: 'rgba(134,239,172,0.12)' },
+  { label: 'Unread Messages', value: '2', icon: MessageSquare, color: '#c084fc',  bg: 'rgba(192,132,252,0.12)' },
 ];
 
 export default function CitizenDashboard() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const [cases, setCases] = useState(MOCK_CASES);
+  const [cases, setCases] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Uncomment to use real API:
-  // useEffect(() => {
-  //   axios.get('/cases/my').then(r => setCases(r.data.cases)).catch(() => {});
-  // }, []);
+  // Use real API:
+  useEffect(() => {
+    setLoading(true);
+    const token = localStorage.getItem('lexaid_token');
+    axios.get(`${API}/cases/my`, { 
+      headers: { Authorization: `Bearer ${token}` } 
+    })
+    .then(r => setCases(r.data.cases))
+    .catch(() => {})
+    .finally(() => setLoading(false));
+  }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface-900">
+    <div className="flex h-screen overflow-hidden" style={{ background: '#000000' }}>
       {/* Desktop sidebar */}
       <div className="hidden lg:block flex-shrink-0">
         <CitizenSidebar />
@@ -71,7 +80,8 @@ export default function CitizenDashboard() {
       {/* Main */}
       <main className="flex-1 overflow-y-auto">
         {/* Top bar */}
-        <div className="sticky top-0 z-30 bg-surface-900/80 backdrop-blur-md border-b border-white/8 px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 z-30 backdrop-blur-md px-4 sm:px-6 py-4 flex items-center justify-between"
+          style={{ background: 'rgba(20,33,61,0.90)', borderBottom: '1px solid rgba(252,163,17,0.12)' }}>
           <div className="flex items-center gap-3">
             <button id="citizen-mobile-menu" onClick={() => setSidebarOpen(true)} className="lg:hidden btn-ghost p-2">
               <Menu className="w-5 h-5" />
@@ -94,11 +104,16 @@ export default function CitizenDashboard() {
         <div className="p-6 max-w-5xl mx-auto space-y-8">
 
           {/* Stats */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in">
-            {MOCK_STATS.map(({ label, value, icon: Icon, color, bg }) => (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 animate-fade-in">
+            {[
+              { label: 'Total Cases',     value: cases.length, icon: FolderOpen,    color: '#FCA311',  bg: 'rgba(252,163,17,0.12)' },
+              { label: 'In Progress',     value: cases.filter(c => ['assigned','in_progress'].includes(c.status)).length, icon: Clock,         color: '#fbbf24',  bg: 'rgba(251,191,36,0.12)' },
+              { label: 'Resolved',        value: cases.filter(c => ['resolved','closed'].includes(c.status)).length, icon: CheckCircle2,  color: '#86efac',  bg: 'rgba(134,239,172,0.12)' },
+              { label: 'Notifications',   value: '0', icon: Bell, color: '#c084fc',  bg: 'rgba(192,132,252,0.12)' },
+            ].map(({ label, value, icon: Icon, color, bg }) => (
               <div key={label} className="stat-card">
-                <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center mb-2`}>
-                  <Icon className={`w-4 h-4 ${color}`} />
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2 flex-shrink-0" style={{ background: bg }}>
+                  <Icon className="w-4 h-4" style={{ color }} />
                 </div>
                 <p className="text-2xl font-bold text-white font-display">{value}</p>
                 <p className="text-xs text-gray-500">{label}</p>
@@ -113,7 +128,7 @@ export default function CitizenDashboard() {
                 <h2 className="section-title text-xl">{t('nav.cases')}</h2>
                 <p className="section-subtitle">Your submitted legal queries</p>
               </div>
-              <Link to="/citizen/cases/new" className="btn-ghost text-brand-400 hover:text-brand-300">
+              <Link to="/citizen/cases/new" className="btn-ghost text-xs" style={{ color: '#FCA311' }}>
                 <PlusCircle className="w-4 h-4" /> New Case
               </Link>
             </div>
@@ -137,8 +152,8 @@ export default function CitizenDashboard() {
                       id={`case-${c.id}`}
                       className="card-hover flex items-center gap-4"
                     >
-                      <div className="w-10 h-10 rounded-xl bg-brand-600/15 flex items-center justify-center flex-shrink-0">
-                        <Icon className="w-5 h-5 text-brand-400" />
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(252,163,17,0.12)' }}>
+                        <Icon className="w-5 h-5" style={{ color: '#FCA311' }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -162,15 +177,15 @@ export default function CitizenDashboard() {
 
           {/* Quick links */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-slide-up">
-            <div className="card bg-gradient-to-br from-brand-600/15 to-purple-600/10 border-brand-500/20">
+            <div className="card" style={{ background: 'rgba(252,163,17,0.08)', border: '1px solid rgba(252,163,17,0.20)' }}>
               <h3 className="text-sm font-semibold text-white mb-1">📚 Legal Resource Library</h3>
               <p className="text-xs text-gray-400 mb-4">Self-help guides on tenant rights, employment law, and more — in your language.</p>
-              <Link to="/library" className="btn-ghost text-brand-400 text-xs px-0">Browse Articles <ChevronRight className="w-3.5 h-3.5" /></Link>
+              <Link to="/library" className="btn-ghost text-xs px-0" style={{ color: '#FCA311' }}>Browse Articles <ChevronRight className="w-3.5 h-3.5" /></Link>
             </div>
-            <div className="card bg-gradient-to-br from-accent-500/10 to-green-600/5 border-accent-500/20">
+            <div className="card" style={{ background: 'rgba(20,33,61,0.50)', border: '1px solid rgba(252,163,17,0.15)' }}>
               <h3 className="text-sm font-semibold text-white mb-1">⚖️ About Legal Aid</h3>
               <p className="text-xs text-gray-400 mb-4">Understand your rights and how LexAid's volunteer lawyers can help you.</p>
-              <Link to="/" className="btn-ghost text-accent-400 text-xs px-0">Learn More <ChevronRight className="w-3.5 h-3.5" /></Link>
+              <Link to="/" className="btn-ghost text-xs px-0" style={{ color: '#FCA311' }}>Learn More <ChevronRight className="w-3.5 h-3.5" /></Link>
             </div>
           </div>
         </div>

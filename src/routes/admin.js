@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
 const pool    = require('../config/db');
+const { notifyBySMS } = require('../services/sms');
 
 // GET /api/admin/stats
 router.get('/stats', authenticate, authorize('admin'), async (req, res) => {
@@ -45,7 +46,7 @@ router.patch('/lawyers/:id/approve', authenticate, authorize('admin'), async (re
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query("UPDATE users SET status = 'active' WHERE id = $1 AND role = 'lawyer'", [req.params.id]);
+    const u = await client.query("UPDATE users SET status = 'active' WHERE id = $1 AND role = 'lawyer' RETURNING phone", [req.params.id]);
     await client.query("UPDATE lawyer_profiles SET slba_verified = TRUE WHERE user_id = $1", [req.params.id]);
     await client.query(
       `INSERT INTO notifications (user_id, type, title, body)
@@ -57,6 +58,10 @@ router.patch('/lawyers/:id/approve', authenticate, authorize('admin'), async (re
       [req.user.id, req.params.id]
     );
     await client.query('COMMIT');
+
+    // SMS (non-blocking)
+    if (u.rows[0]?.phone) notifyBySMS(u.rows[0].phone, 'lawyer_approved').catch(() => {});
+
     res.json({ message: 'Lawyer approved' });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -71,7 +76,7 @@ router.patch('/lawyers/:id/reject', authenticate, authorize('admin'), async (req
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query("UPDATE users SET status = 'suspended' WHERE id = $1 AND role = 'lawyer'", [req.params.id]);
+    const u = await client.query("UPDATE users SET status = 'suspended' WHERE id = $1 AND role = 'lawyer' RETURNING phone", [req.params.id]);
     await client.query(
       `INSERT INTO notifications (user_id, type, title, body)
        VALUES ($1, 'lawyer_rejected', 'Account Rejected', 'Your LexAid lawyer registration was not approved. Please contact support.')`,
@@ -82,6 +87,10 @@ router.patch('/lawyers/:id/reject', authenticate, authorize('admin'), async (req
       [req.user.id, req.params.id]
     );
     await client.query('COMMIT');
+
+    // SMS (non-blocking)
+    if (u.rows[0]?.phone) notifyBySMS(u.rows[0].phone, 'lawyer_rejected').catch(() => {});
+
     res.json({ message: 'Lawyer rejected' });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -128,6 +137,107 @@ router.patch('/users/:id/reactivate', authenticate, authorize('admin'), async (r
     res.json({ message: 'User reactivated' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to reactivate user' });
+  }
+});
+
+// GET /api/admin/overdue-cases
+router.get('/overdue-cases', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT ref, title, status, 
+              EXTRACT(EPOCH FROM (NOW() - created_at))/3600 AS hours_since_creation
+       FROM cases 
+       WHERE sla_deadline < NOW() AND status NOT IN ('resolved','closed')
+       ORDER BY sla_deadline ASC`
+    );
+    res.json({ cases: result.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not fetch overdue cases' });
+  }
+});
+
+// GET /api/admin/lang-stats
+router.get('/lang-stats', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT preferred_lang, COUNT(*) FROM users GROUP BY preferred_lang`
+    );
+    res.json({ stats: result.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not fetch language stats' });
+  }
+});
+
+// GET /api/admin/active-lawyers
+router.get('/active-lawyers', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.full_name, u.email, lp.specialisations
+       FROM users u
+       JOIN lawyer_profiles lp ON lp.user_id = u.id
+       WHERE u.role = 'lawyer' AND u.status = 'active' AND lp.slba_verified = TRUE
+       ORDER BY u.full_name ASC`
+    );
+    res.json({ lawyers: result.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not fetch active lawyers' });
+  }
+});
+
+// PATCH /api/admin/cases/:id/assign
+router.patch('/cases/:id/assign', authenticate, authorize('admin'), async (req, res) => {
+  const { lawyer_id } = req.body;
+  if (!lawyer_id) return res.status(400).json({ message: 'Lawyer ID is required' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Check if case exists
+    const c = await client.query('SELECT ref, citizen_id FROM cases WHERE id = $1', [req.params.id]);
+    if (!c.rows[0]) { await client.query('ROLLBACK'); return res.status(404).json({ message: 'Case not found' }); }
+
+    // Update case
+    await client.query(
+      `UPDATE cases SET lawyer_id = $1, status = 'assigned', assigned_at = NOW()
+       WHERE id = $2`,
+      [lawyer_id, req.params.id]
+    );
+
+    // Notify lawyer
+    await client.query(
+      `INSERT INTO notifications (user_id, type, title, body, ref_case_id)
+       VALUES ($1, 'case_assigned', 'New Case Assigned', $2, $3)`,
+      [lawyer_id, `Administrator has assigned case ${c.rows[0].ref} to you.`, req.params.id]
+    );
+
+    // Notify citizen
+    await client.query(
+      `INSERT INTO notifications (user_id, type, title, body, ref_case_id)
+       VALUES ($1, 'case_assigned', 'Lawyer Assigned', $2, $3)`,
+      [c.rows[0].citizen_id, `A lawyer has been assigned to your case ${c.rows[0].ref} by an administrator.`, req.params.id]
+    );
+
+    await client.query('COMMIT');
+
+    // SMS Notifications
+    try {
+      const [lawyer, citizen] = await Promise.all([
+        pool.query('SELECT phone FROM users WHERE id = $1', [lawyer_id]),
+        pool.query('SELECT phone FROM users WHERE id = $1', [c.rows[0].citizen_id]),
+      ]);
+      if (lawyer.rows[0]?.phone)  notifyBySMS(lawyer.rows[0].phone,  'case_assigned', c.rows[0].ref).catch(() => {});
+      if (citizen.rows[0]?.phone) notifyBySMS(citizen.rows[0].phone, 'case_assigned', c.rows[0].ref).catch(() => {});
+    } catch (e) {
+      console.error('[Admin] SMS trigger failed:', e);
+    }
+
+    res.json({ message: 'Lawyer assigned successfully' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ message: 'Failed to assign lawyer' });
+  } finally {
+    client.release();
   }
 });
 
