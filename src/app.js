@@ -12,18 +12,34 @@ const app = express();
 app.use(helmet());
 
 // Support multiple origins: CLIENT_URL can be comma-separated
-// e.g. "http://localhost:5173,https://lexaid.netlify.app"
+// e.g. "http://localhost:5173,https://lexaidlk.netlify.app"
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
-  .split(',').map(o => o.trim());
+  .split(',')
+  .map(o => o.trim().replace(/\/$/, ''));  // trim spaces and trailing slashes
 
-app.use(cors({
+console.log('[CORS] Allowed origins:', allowedOrigins);
+
+const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (curl, mobile apps, Render health checks)
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error(`CORS: origin ${origin} not allowed`));
+    // Allow requests with no origin (Render health checks, curl, mobile apps)
+    if (!origin) return callback(null, true);
+
+    const normalised = origin.replace(/\/$/, '');
+    if (allowedOrigins.includes(normalised)) {
+      return callback(null, true);
+    }
+
+    console.warn(`[CORS] Blocked origin: ${origin}`);
+    // Return null (not an Error) so Express doesn't crash — browser will see CORS failure
+    callback(null, false);
   },
   credentials: true,
-}));
+  optionsSuccessStatus: 200,  // some older browsers choke on 204
+};
+
+app.use(cors(corsOptions));
+// Explicitly handle preflight for all routes
+app.options('*', cors(corsOptions));
 
 
 // ── Rate limiting ─────────────────────────────────────────────
