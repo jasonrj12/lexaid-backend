@@ -5,6 +5,8 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
+const dns = require('dns');
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },  // required for Supabase
@@ -12,6 +14,10 @@ const pool = new Pool({
   max: 10,               // max connections in pool
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
+  // Force IPv4 to avoid ENETUNREACH on environments without IPv6 support (like Render)
+  lookup: (hostname, options, callback) => {
+    dns.lookup(hostname, { family: 4 }, callback);
+  },
 });
 
 // Test connection on startup
