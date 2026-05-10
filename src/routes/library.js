@@ -75,6 +75,22 @@ router.post('/',
   }
 );
 
+// GET /api/library/queue (admin)
+router.get('/queue', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT la.id, la.slug, la.title_en, la.category, la.status, la.created_at, u.full_name AS author
+       FROM library_articles la
+       JOIN users u ON u.id = la.author_id
+       WHERE la.status = 'pending_review'
+       ORDER BY la.created_at ASC`
+    );
+    res.json({ articles: result.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not fetch library queue' });
+  }
+});
+
 // PATCH /api/library/:id/publish (admin)
 router.patch('/:id/publish', authenticate, authorize('admin'), async (req, res) => {
   try {

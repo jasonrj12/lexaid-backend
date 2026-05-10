@@ -276,6 +276,64 @@ function CasesList() {
   );
 }
 
+// ── Library Queue Management Section ─────────────────────────────────────
+function LibraryQueue() {
+  const [articles, setArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    try {
+      const { data } = await axios.get(`${API}/library/queue`, { headers: authHeader() });
+      setArticles(data.articles);
+    } catch { toast.error('Failed to load library queue'); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handlePublish = async (id) => {
+    try {
+      await axios.patch(`${API}/library/${id}/publish`, {}, { headers: authHeader() });
+      toast.success('Article published successfully');
+      load();
+    } catch { toast.error('Failed to publish article'); }
+  };
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-brand-400 animate-spin" /></div>;
+
+  return (
+    <div className="space-y-6 animate-slide-up">
+      <div className="flex items-center justify-between">
+        <h2 className="section-title text-xl">Library Review Queue</h2>
+        <span className="badge badge-review">{articles.length} pending review</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {articles.length === 0 ? (
+          <div className="card col-span-full py-12 text-center text-gray-500">
+            <BookOpen className="w-12 h-12 text-brand-500/20 mx-auto mb-4" />
+            <p>No articles awaiting review.</p>
+          </div>
+        ) : articles.map(a => (
+          <div key={a.id} className="card border-white/5 hover:border-brand-500/30 transition-colors">
+            <div className="flex justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-bold text-white">{a.title_en}</h3>
+                <p className="text-xs text-gray-500">Author: {a.author}</p>
+              </div>
+              <span className="badge badge-progress text-[10px] capitalize">{a.category}</span>
+            </div>
+            <p className="text-xs text-gray-600 mb-4">Submitted: {new Date(a.created_at).toLocaleDateString()}</p>
+            <div className="flex gap-2">
+              <Link to={`/library/${a.slug}`} className="btn-secondary flex-1 text-xs py-2 text-center">Preview</Link>
+              <button onClick={() => handlePublish(a.id)} className="btn-accent flex-1 text-xs py-2">Publish</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const { section = 'overview' } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -308,9 +366,10 @@ export default function AdminDashboard() {
           {section === 'lawyers'  && <LawyerVerif />}
           {section === 'users'    && <UsersList />}
           {section === 'cases'    && <CasesList />}
+          {section === 'library'  && <LibraryQueue />}
           
           {/* Fallback for sections not yet fully implemented */}
-          {!['overview', 'lawyers', 'users', 'cases'].includes(section) && (
+          {!['overview', 'lawyers', 'users', 'cases', 'library'].includes(section) && (
             <div className="card py-20 text-center">
               <ShieldCheck className="w-16 h-16 text-brand-400/20 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-white mb-2">Section Under Development</h2>
