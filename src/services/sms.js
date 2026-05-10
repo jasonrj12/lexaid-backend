@@ -1,35 +1,40 @@
 /**
  * SMS Notification Service — Text.lk API integration
- * As specified in LexAid proposal §4.5 & §8
+ * LexAid proposal §4.5 & §8
+ * Auth: Bearer token (Laravel Sanctum format: "id|token")
  * Fallback: in-app notifications only if SMS fails (§10 risk mitigation)
  */
 
 const https = require('https');
-const querystring = require('querystring');
 
-const TEXTLK_BASE  = 'https://app.text.lk';
-const SENDER_ID    = process.env.TEXTLK_SENDER_ID || 'LexAid';
-const API_KEY      = process.env.TEXTLK_API_KEY;
+const SMS_ENABLED   = process.env.SMS_ENABLED === 'true';
+const API_TOKEN     = process.env.SMS_API_TOKEN;
+const SENDER_ID     = process.env.SMS_SENDER_ID || 'LexAid';
 
 /**
  * Send a single SMS via Text.lk
  * @param {string} to   - Sri Lankan mobile number (e.g. 0771234567 or +94771234567)
  * @param {string} text - Message body (max 160 chars per segment)
- * @returns {Promise<{success:boolean, response:any}>}
+ * @returns {Promise<{success:boolean, response?:any, reason?:string}>}
  */
 async function sendSMS(to, text) {
-  if (!API_KEY || API_KEY === 'your_textlk_api_key') {
-    console.warn('[SMS] TEXTLK_API_KEY not configured — SMS skipped (in-app only)');
-    return { success: false, reason: 'api_key_not_configured' };
+  if (!SMS_ENABLED) {
+    console.info('[SMS] SMS_ENABLED=false — skipped');
+    return { success: false, reason: 'sms_disabled' };
+  }
+  if (!API_TOKEN) {
+    console.warn('[SMS] SMS_API_TOKEN not configured — SMS skipped (in-app only)');
+    return { success: false, reason: 'token_not_configured' };
   }
 
-  // Normalise to international format
-  const normalised = to.startsWith('+94') ? to : to.startsWith('0') ? '+94' + to.slice(1) : to;
+  // Normalise to international format (+94XXXXXXXXX)
+  let normalised = to.replace(/\s+/g, '');
+  if (normalised.startsWith('0'))       normalised = '+94' + normalised.slice(1);
+  else if (!normalised.startsWith('+')) normalised = '+94' + normalised;
 
-  const payload = querystring.stringify({
-    api_key:   API_KEY,
+  const payload = JSON.stringify({
+    recipient: normalised,
     sender_id: SENDER_ID,
-    to:        normalised,
     message:   text,
   });
 
@@ -39,9 +44,10 @@ async function sendSMS(to, text) {
       path:     '/api/v3/sms/send',
       method:   'POST',
       headers: {
-        'Content-Type':   'application/x-www-form-urlencoded',
-        'Content-Length': Buffer.byteLength(payload),
+        'Content-Type':   'application/json',
         'Accept':         'application/json',
+        'Authorization':  `Bearer ${API_TOKEN}`,
+        'Content-Length': Buffer.byteLength(payload),
       },
     };
 
@@ -51,14 +57,15 @@ async function sendSMS(to, text) {
       res.on('end', () => {
         try {
           const json = JSON.parse(data);
-          if (json.status === 'success') {
-            console.log(`[SMS] Sent to ${normalised}`);
+          if (res.statusCode === 200 && json.status === 'success') {
+            console.log(`[SMS] ✅ Sent to ${normalised}`);
             resolve({ success: true, response: json });
           } else {
-            console.error('[SMS] API error:', json);
+            console.error(`[SMS] ❌ API error (HTTP ${res.statusCode}):`, json);
             resolve({ success: false, response: json });
           }
         } catch {
+          console.error('[SMS] Failed to parse response:', data);
           resolve({ success: false, response: data });
         }
       });
@@ -75,7 +82,7 @@ async function sendSMS(to, text) {
 }
 
 /**
- * Convenience wrappers for LexAid notification triggers (§4.5)
+ * LexAid notification message templates (§4.5)
  */
 const SMS_TEMPLATES = {
   case_submitted:  (ref) => `LexAid: Your case ${ref} has been submitted and is under review. You will be notified when a lawyer is assigned.`,
@@ -87,6 +94,12 @@ const SMS_TEMPLATES = {
   lawyer_rejected:  ()   => `LexAid: Your LexAid lawyer registration was not approved. Please contact support for more information.`,
 };
 
+/**
+ * Send a templated SMS notification
+ * @param {string} phone - Recipient phone number
+ * @param {string} type  - One of the SMS_TEMPLATES keys
+ * @param {string} ref   - Case reference number (optional)
+ */
 async function notifyBySMS(phone, type, ref = '') {
   const templateFn = SMS_TEMPLATES[type];
   if (!templateFn || !phone) return { success: false, reason: 'no_template_or_phone' };
