@@ -1,0 +1,41 @@
+# Render.com deployment configuration
+# Deploy only the backend (Node.js/Express API)
+
+services:
+  - type: web
+    name: lexaid-api
+    runtime: node
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # Set these in the Render dashboard → Environment:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: BCRYPT_ROUNDS
+        value: 12
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: TEXTLK_API_KEY
+        sync: false
+      - key: TEXTLK_SENDER_ID
+        value: LexAid
+      - key: CLIENT_URL
+        sync: false
+      - key: MAX_FILE_SIZE_MB
+        value: 5
+      - key: UPLOAD_DIR
+        value: uploads
