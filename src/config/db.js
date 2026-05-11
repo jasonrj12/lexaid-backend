@@ -1,39 +1,62 @@
 const { Pool } = require('pg');
+const dns = require('dns').promises;
+const url = require('url');
 
-if (!process.env.DATABASE_URL) {
-  console.error('❌ DATABASE_URL environment variable is not set');
-  process.exit(1);
+let pool;
+
+/**
+ * Force IPv4 resolution for Supabase hostnames.
+ * This is the most reliable way to avoid ENETUNREACH on Render.
+ */
+async function initializePool() {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    console.error('❌ DATABASE_URL is not set');
+    return;
+  }
+
+  const parsedUrl = url.parse(dbUrl);
+  const hostname = parsedUrl.hostname;
+
+  console.log(`[DB] Forcing IPv4 resolution for: ${hostname}`);
+  
+  try {
+    // Manually resolve to IPv4 address
+    const addresses = await dns.resolve4(hostname);
+    const ipv4 = addresses[0];
+    
+    // Construct new connection string using the IP address
+    const newDbUrl = dbUrl.replace(hostname, ipv4);
+
+    pool = new Pool({
+      connectionString: newDbUrl,
+      ssl: { rejectUnauthorized: false },
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    });
+
+    // Verify connection
+    const client = await pool.connect();
+    console.log(`✅ Database connected successfully via IPv4 (${ipv4})`);
+    client.release();
+  } catch (err) {
+    console.error(`❌ Database connection failed: ${err.message}`);
+    console.log('[DB] Falling back to standard resolution...');
+    pool = new Pool({
+      connectionString: dbUrl,
+      ssl: { rejectUnauthorized: false },
+    });
+  }
 }
 
-const dns = require('dns');
+// Start initialization
+initializePool();
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },  // required for Supabase
-  // Connection pool settings optimised for Supabase pooler + Render free tier
-  max: 10,               // max connections in pool
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-  // Force IPv4 to avoid ENETUNREACH on environments without IPv6 support (like Render)
-  lookup: (hostname, options, callback) => {
-    dns.lookup(hostname, { family: 4 }, callback);
-  },
-});
-
-// Test connection on startup
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('❌ Database connection error:', err.message);
-    console.error('   Code:', err.code);
-    console.error('   Stack:', err.stack);
-    console.error('\n💡 Troubleshooting Tip:');
-    console.error('   - If error is ENETUNREACH, ensure src/server.js has ipv4first DNS setting.');
-    console.error('   - Check if your IP is whitelisted in Supabase (0.0.0.0/0 for Render).');
-    console.error('   - Verify DATABASE_URL is set correctly in Render Dashboard.');
-  } else {
-    console.log('✅ Database connected successfully to Supabase');
-    release();
-  }
-});
-
-module.exports = pool;
+// Export as an object with the same methods as a Pool instance
+module.exports = {
+  query: (...args) => pool.query(...args),
+  connect: (...args) => pool.connect(...args),
+  end: (...args) => pool.end(...args),
+  on: (...args) => pool.on(...args),
+};
