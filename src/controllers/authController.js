@@ -106,10 +106,25 @@ async function register(req, res) {
     const user = result.rows[0];
 
     if (role === 'lawyer') {
+      const { uploadToSupabase } = require('../services/supabase');
+      
+      let idCardUrl = req.files && req.files['id_card'] ? `/uploads/${req.files['id_card'][0].filename}` : null;
+      let facePhotoUrl = req.files && req.files['face_photo'] ? `/uploads/${req.files['face_photo'][0].filename}` : null;
+
+      // Try Supabase Upload
+      if (req.files && req.files['id_card']) {
+        const supUrl = await uploadToSupabase(req.files['id_card'][0], 'id_cards');
+        if (supUrl) idCardUrl = supUrl;
+      }
+      if (req.files && req.files['face_photo']) {
+        const supUrl = await uploadToSupabase(req.files['face_photo'][0], 'selfies');
+        if (supUrl) facePhotoUrl = supUrl;
+      }
+
       await client.query(
-        `INSERT INTO lawyer_profiles (user_id, slba_number, specialisations)
-         VALUES ($1, $2, $3)`,
-        [user.id, slba_number, specialisations || []]
+        `INSERT INTO lawyer_profiles (user_id, slba_number, specialisations, id_card_url, face_photo_url, is_face_verified)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [user.id, slba_number, specialisations || [], idCardUrl, facePhotoUrl, false]
       );
     }
 

@@ -146,27 +146,62 @@ function LawyerVerif() {
         <h2 className="section-title text-xl">Lawyer Verification Queue</h2>
         <span className="badge badge-review">{lawyers.length} awaiting review</span>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {lawyers.length === 0 ? (
           <div className="card col-span-full py-12 text-center text-gray-500">
             <CheckCircle2 className="w-12 h-12 text-accent-500/20 mx-auto mb-4" />
             <p>Verification queue is empty.</p>
           </div>
         ) : lawyers.map(l => (
-          <div key={l.id} className="card border-white/5 hover:border-brand-500/30 transition-colors">
-            <div className="flex justify-between mb-3">
+          <div key={l.id} className="card border-white/5 hover:border-brand-500/30 transition-colors flex flex-col">
+            <div className="flex justify-between mb-4">
               <div>
-                <h3 className="text-sm font-bold text-white">{l.full_name}</h3>
-                <p className="text-xs text-gray-500">{l.email}</p>
+                <h3 className="text-base font-bold text-white">{l.full_name}</h3>
+                <p className="text-sm text-gray-500">{l.email}</p>
               </div>
-              <span className="text-[10px] font-mono text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20">{l.slba_number}</span>
+              <div className="text-right">
+                <span className="text-xs font-mono text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20">{l.slba_number}</span>
+                <p className="text-[10px] text-gray-600 mt-1">Joined {new Date(l.created_at).toLocaleDateString()}</p>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1 mb-4">
+
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">ID Card</p>
+                <div className="aspect-video rounded-lg overflow-hidden bg-surface-600 border border-white/10 group relative">
+                  {l.id_card_url?.endsWith('.pdf') ? (
+                    <div className="w-full h-full flex items-center justify-center bg-surface-700 text-gray-400">
+                      <FolderOpen className="w-8 h-8" />
+                      <span className="text-[10px] ml-1">PDF</span>
+                    </div>
+                  ) : (
+                    <img src={l.id_card_url?.startsWith('http') ? l.id_card_url : `${API.replace('/api','')}${l.id_card_url}`} alt="ID Card" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                  )}
+                  <a href={l.id_card_url?.startsWith('http') ? l.id_card_url : `${API.replace('/api','')}${l.id_card_url}`} target="_blank" rel="noreferrer" 
+                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <Eye className="w-6 h-6 text-white" />
+                  </a>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Face Verification</p>
+                <div className="aspect-video rounded-lg overflow-hidden bg-surface-600 border border-white/10 group relative">
+                  <img src={l.face_photo_url?.startsWith('http') ? l.face_photo_url : `${API.replace('/api','')}${l.face_photo_url}`} alt="Face" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                  <a href={l.face_photo_url?.startsWith('http') ? l.face_photo_url : `${API.replace('/api','')}${l.face_photo_url}`} target="_blank" rel="noreferrer" 
+                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <Eye className="w-6 h-6 text-white" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1 mb-5">
               {(l.specialisations || []).map(s => <span key={s} className="badge badge-progress text-[10px]">{s}</span>)}
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => handleAction(l.id, 'approve')} className="btn-accent flex-1 text-xs py-2">Approve</button>
-              <button onClick={() => handleAction(l.id, 'reject')} className="btn-danger flex-1 text-xs py-2">Reject</button>
+
+            <div className="flex gap-3 mt-auto">
+              <button onClick={() => handleAction(l.id, 'approve')} className="btn-accent flex-1 py-2.5 text-sm">Approve Lawyer</button>
+              <button onClick={() => handleAction(l.id, 'reject')} className="btn-ghost flex-1 py-2.5 text-sm text-red-400 hover:bg-red-500/10">Reject</button>
             </div>
           </div>
         ))}

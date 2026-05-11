@@ -246,3 +246,26 @@
 
   .section-title { font-size: 1.5rem; }
 }
+
+/* ─── Extra Utilities ─────────────────────────────────────────────── */
+.mirror {
+  transform: scaleX(-1);
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.15; }
+}

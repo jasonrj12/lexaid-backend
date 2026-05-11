@@ -34,8 +34,9 @@ function SimplifyPreview({ text, messageId }) {
       );
       setSimplified(data.simplified);
       setShow(true);
-    } catch {
-      toast.error('Preview unavailable. Citizen can still simplify from their view.');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Preview unavailable. Citizen can still simplify from their view.';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

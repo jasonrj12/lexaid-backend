@@ -102,8 +102,9 @@ function SimplifyButton({ text, lang, messageId }) {
       );
       setSimplified(data.simplified);
       setShowSimplified(true);
-    } catch {
-      toast.error('Simplification unavailable. Please read the original response.');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Simplification unavailable. Please read the original response.';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

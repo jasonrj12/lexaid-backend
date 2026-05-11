@@ -1,10 +1,9 @@
 /**
- * AI-Assisted Features — OpenAI Chat Completions API
+ * AI-Assisted Features — Dual Provider (Gemini & OpenAI)
  * §4.8.1  AI Case Category Suggestion
  * §4.8.2  Plain Language Simplifier
  *
- * Both features use a single lightweight prompt-and-response with no
- * persistent state, integrated via the OpenAI Chat Completions REST API.
+ * Prefers Google Gemini (Free Tier compatible) with OpenAI as fallback.
  */
 
 const express = require('express');
@@ -13,8 +12,60 @@ const https   = require('https');
 const { authenticate } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL   = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const OPENAI_API_KEY   = process.env.OPENAI_API_KEY;
+const OPENAI_MODEL     = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const GOOGLE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY;
+
+/** Wrapper for Google Gemini REST API */
+function callGemini(systemPrompt, userMessage) {
+  return new Promise((resolve, reject) => {
+    if (!GOOGLE_AI_API_KEY) return reject(new Error('GOOGLE_AI_API_KEY not configured'));
+
+    const payload = JSON.stringify({
+      system_instruction: {
+        parts: [{ text: systemPrompt }]
+      },
+      contents: [
+        {
+          parts: [{ text: userMessage }]
+        }
+      ],
+      generationConfig: {
+        maxOutputTokens: 512,
+        temperature: 0.1
+      }
+    });
+
+    const options = {
+      hostname: 'generativelanguage.googleapis.com',
+      path:     `/v1beta/models/gemini-flash-latest:generateContent?key=${GOOGLE_AI_API_KEY}`,
+      method:   'POST',
+      headers: {
+        'Content-Type':   'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.error) return reject(new Error(json.error.message || 'Gemini API error'));
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          resolve(text.trim());
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
 
 /** Thin wrapper around the OpenAI Chat Completions REST API */
 function callOpenAI(systemPrompt, userMessage) {
@@ -64,9 +115,19 @@ function callOpenAI(systemPrompt, userMessage) {
   });
 }
 
+/** Unified AI call: Gemini first, OpenAI second */
+async function callAI(system, user) {
+  if (GOOGLE_AI_API_KEY) {
+    try {
+      return await callGemini(system, user);
+    } catch (err) {
+      console.warn('[AI] Gemini failed, attempting OpenAI...', err.message);
+    }
+  }
+  return await callOpenAI(system, user);
+}
+
 // ── §4.8.1 POST /api/ai/suggest-category ─────────────────────────────────────
-// Given a free-text description, return the most appropriate legal category.
-// Called during case submission (citizen portal).
 router.post(
   '/suggest-category',
   authenticate,
@@ -76,7 +137,6 @@ router.post(
     if (!errors.isEmpty()) return res.status(400).json({ message: errors.array()[0].msg });
 
     const { description } = req.body;
-
     const system = `You are a legal categorisation assistant for LexAid, a Sri Lankan legal aid platform.
 Given a citizen's description of their legal issue, classify it into EXACTLY ONE of these categories:
 - land       (Land & Property disputes, boundary issues, deed problems, eviction, tenancy)
@@ -90,21 +150,18 @@ Respond with ONLY the category key (one of: land, labour, consumer, family, crim
 Do NOT include any explanation, punctuation, or extra text.`;
 
     try {
-      const category = await callOpenAI(system, description);
+      const category = await callAI(system, description);
       const valid = ['land', 'labour', 'consumer', 'family', 'criminal', 'other'];
       const suggested = valid.includes(category.toLowerCase()) ? category.toLowerCase() : 'other';
       res.json({ suggested_category: suggested });
     } catch (err) {
       console.error('[AI:suggest-category]', err.message);
-      // Graceful fallback — citizen selects manually
       res.json({ suggested_category: null, fallback: true });
     }
   }
 );
 
 // ── §4.8.2 POST /api/ai/simplify ─────────────────────────────────────────────
-// Given a lawyer's response text (and an optional language), return a
-// plain-language paraphrase for the citizen.
 router.post(
   '/simplify',
   authenticate,
@@ -117,7 +174,6 @@ router.post(
     if (!errors.isEmpty()) return res.status(400).json({ message: errors.array()[0].msg });
 
     let { text, lang = 'en' } = req.body;
-    // Normalize lang (e.g. 'en-US' -> 'en')
     lang = String(lang).slice(0, 2).toLowerCase();
     if (!['en', 'si', 'ta'].includes(lang)) lang = 'en';
 
@@ -136,11 +192,18 @@ Rules:
 IMPORTANT DISCLAIMER: Include at the end, on a new line: "[AI-simplified paraphrase. The original lawyer response remains the authoritative guidance.]"`;
 
     try {
-      const simplified = await callOpenAI(system, text);
+      const simplified = await callAI(system, text);
       res.json({ simplified });
     } catch (err) {
       console.error('[AI:simplify]', err.message);
-      res.status(503).json({ message: 'AI simplification service is temporarily unavailable. Please read the original response.' });
+      
+      const isQuota = err.message.toLowerCase().includes('quota') || err.message.includes('429');
+      const status = isQuota ? 429 : 503;
+      const message = isQuota 
+        ? 'AI Quota exceeded. Please check your API billing or limits.' 
+        : 'AI simplification service is temporarily unavailable.';
+        
+      res.status(status).json({ message });
     }
   }
 );

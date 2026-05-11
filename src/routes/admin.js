@@ -29,7 +29,7 @@ router.get('/pending-lawyers', authenticate, authorize('admin'), async (req, res
   try {
     const result = await pool.query(
       `SELECT u.id, u.full_name, u.email, u.created_at,
-              lp.slba_number, lp.specialisations
+              lp.slba_number, lp.specialisations, lp.id_card_url, lp.face_photo_url, lp.is_face_verified
        FROM users u
        JOIN lawyer_profiles lp ON lp.user_id = u.id
        WHERE u.role = 'lawyer' AND u.status = 'pending'
@@ -47,7 +47,7 @@ router.patch('/lawyers/:id/approve', authenticate, authorize('admin'), async (re
   try {
     await client.query('BEGIN');
     const u = await client.query("UPDATE users SET status = 'active' WHERE id = $1 AND role = 'lawyer' RETURNING phone", [req.params.id]);
-    await client.query("UPDATE lawyer_profiles SET slba_verified = TRUE WHERE user_id = $1", [req.params.id]);
+    await client.query("UPDATE lawyer_profiles SET slba_verified = TRUE, is_face_verified = TRUE WHERE user_id = $1", [req.params.id]);
     await client.query(
       `INSERT INTO notifications (user_id, type, title, body)
        VALUES ($1, 'lawyer_approved', 'Account Approved', 'Your LexAid lawyer account has been verified and activated.')`,

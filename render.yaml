@@ -39,3 +39,9 @@ services:
         value: 5
       - key: UPLOAD_DIR
         value: uploads
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: lawyer-verifications

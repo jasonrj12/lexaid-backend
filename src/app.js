@@ -9,7 +9,9 @@ const path      = require('path');
 const app = express();
 
 // ── Security middleware ───────────────────────────────────────
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
 // Support multiple origins: CLIENT_URL can be comma-separated
 // e.g. "http://localhost:5173,https://lexaidlk.netlify.app"
@@ -62,7 +64,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan(process.env.NODE_ENV === 'development' ? 'dev' : 'combined'));
 
 // ── Static uploads ────────────────────────────────────────────
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Allow cross-origin for images so the frontend can display them
+app.use('/uploads', cors(), express.static(path.join(__dirname, '../uploads')));
 
 // ── Routes ────────────────────────────────────────────────────
 const authRoutes          = require('./routes/auth');

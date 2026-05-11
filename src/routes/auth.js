@@ -8,6 +8,7 @@ const {
   verifyOtp, verifyOtpValidation,
 } = require('../controllers/authController');
 const { authenticate } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
 // POST /api/auth/send-otp  — generates & sends a 6-digit OTP via SMS
 router.post('/send-otp', sendOtpValidation, sendOtp);
@@ -16,7 +17,11 @@ router.post('/send-otp', sendOtpValidation, sendOtp);
 router.post('/verify-otp', verifyOtpValidation, verifyOtp);
 
 // POST /api/auth/register
-router.post('/register', registerValidation, register);
+router.post('/register', 
+  upload.fields([{ name: 'id_card', maxCount: 1 }, { name: 'face_photo', maxCount: 1 }]), 
+  registerValidation, 
+  register
+);
 
 // POST /api/auth/login
 router.post('/login', loginValidation, login);
