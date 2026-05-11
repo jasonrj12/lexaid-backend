@@ -4,10 +4,6 @@ const url = require('url');
 
 let pool;
 
-/**
- * Force IPv4 resolution for Supabase hostnames.
- * This is the most reliable way to avoid ENETUNREACH on Render.
- */
 async function initializePool() {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
@@ -18,42 +14,55 @@ async function initializePool() {
   const parsedUrl = url.parse(dbUrl);
   const hostname = parsedUrl.hostname;
 
-  console.log(`[DB] Forcing IPv4 resolution for: ${hostname}`);
+  console.log(`[DB] Attempting to force IPv4 for: ${hostname}`);
   
+  let targetUrl = dbUrl;
   try {
-    // Manually resolve to IPv4 address
-    const addresses = await dns.resolve4(hostname);
-    const ipv4 = addresses[0];
-    
-    // Construct new connection string using the IP address
-    const newDbUrl = dbUrl.replace(hostname, ipv4);
+    // Try resolve4 first (best for direct A records)
+    let ipv4;
+    try {
+      const addresses = await dns.resolve4(hostname);
+      ipv4 = addresses[0];
+    } catch (e) {
+      // Fallback to dns.lookup (better for CNAMEs)
+      const lookup = await dns.lookup(hostname, { family: 4 });
+      ipv4 = lookup.address;
+    }
 
-    pool = new Pool({
-      connectionString: newDbUrl,
-      ssl: { rejectUnauthorized: false },
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-    });
+    if (ipv4) {
+      console.log(`[DB] Success! Forcing connection via IPv4: ${ipv4}`);
+      targetUrl = dbUrl.replace(hostname, ipv4);
+    }
+  } catch (err) {
+    console.warn(`[DB] Warning: Could not find an IPv4 address for ${hostname}.`);
+    console.warn(`     If this is a Supabase IPv6-only project, you MUST use the Transaction Pooler string.`);
+  }
 
-    // Verify connection
+  pool = new Pool({
+    connectionString: targetUrl,
+    ssl: { rejectUnauthorized: false },
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  });
+
+  // Verification
+  try {
     const client = await pool.connect();
-    console.log(`✅ Database connected successfully via IPv4 (${ipv4})`);
+    console.log('✅ Database connected successfully!');
     client.release();
   } catch (err) {
-    console.error(`❌ Database connection failed: ${err.message}`);
-    console.log('[DB] Falling back to standard resolution...');
-    pool = new Pool({
-      connectionString: dbUrl,
-      ssl: { rejectUnauthorized: false },
-    });
+    console.error('❌ Database connection failed after resolution.');
+    console.error(`   Error: ${err.message}`);
+    if (err.message.includes('ENETUNREACH')) {
+      console.error('\n💡 CRITICAL: You are using an IPv6-only hostname.');
+      console.error('   Please switch to the Supabase Transaction Pooler URL in your Render Dashboard.\n');
+    }
   }
 }
 
-// Start initialization
 initializePool();
 
-// Export as an object with the same methods as a Pool instance
 module.exports = {
   query: (...args) => pool.query(...args),
   connect: (...args) => pool.connect(...args),
