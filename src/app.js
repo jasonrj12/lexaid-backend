@@ -87,6 +87,10 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/ai',            aiRoutes);
 
 // ── Health check ──────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.json({ message: 'Welcome to LexAid API', health: '/api/health' });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0' });
 });
