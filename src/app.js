@@ -95,6 +95,14 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to LexAid API', health: '/api/health' });
 });
 
+app.get('/api', (req, res) => {
+  res.json({ 
+    message: 'LexAid API Root', 
+    modules: ['auth', 'cases', 'lawyers', 'admin', 'library', 'notifications', 'ai'],
+    health: '/api/health'
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0' });
 });
