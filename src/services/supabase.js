@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 
@@ -5,7 +6,7 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.warn('[Supabase] Missing credentials. Falling back to local storage.');
+  console.warn('[Supabase] ⚠️ Missing credentials (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY). Falling back to local storage for uploads.');
 }
 
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
