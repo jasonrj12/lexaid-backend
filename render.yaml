@@ -29,8 +29,14 @@ services:
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4o-mini
+      - key: SMS_ENABLED
+        value: "true"
+      - key: SMS_API_TOKEN
+        sync: false
       - key: TEXTLK_API_KEY
         sync: false
+      - key: SMS_SENDER_ID
+        value: LexAid
       - key: TEXTLK_SENDER_ID
         value: LexAid
       - key: CLIENT_URL

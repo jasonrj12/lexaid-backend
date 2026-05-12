@@ -7,9 +7,9 @@
 
 const https = require('https');
 
-const SMS_ENABLED   = process.env.SMS_ENABLED === 'true';
-const API_TOKEN     = process.env.SMS_API_TOKEN;
-const SENDER_ID     = process.env.SMS_SENDER_ID || 'LexAid';
+const SMS_ENABLED   = String(process.env.SMS_ENABLED).toLowerCase().trim() === 'true';
+const API_TOKEN     = process.env.SMS_API_TOKEN || process.env.TEXTLK_API_KEY;
+const SENDER_ID     = process.env.SMS_SENDER_ID || process.env.TEXTLK_SENDER_ID || 'LexAid';
 
 /**
  * Send a single SMS via Text.lk
