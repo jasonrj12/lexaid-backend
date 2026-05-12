@@ -23,6 +23,12 @@ function encryptNIC(nic) {
   return iv.toString('hex') + ':' + enc;
 }
 
+/** Deterministic SHA-256 hash of the normalised NIC — used for uniqueness checks.
+ *  We can't query the AES-encrypted value because each encryption uses a random IV. */
+function hashNIC(nic) {
+  return crypto.createHash('sha256').update(nic.trim().toUpperCase()).digest('hex');
+}
+
 function decryptNIC(encrypted) {
   try {
     const [ivHex, enc] = encrypted.split(':');
@@ -88,7 +94,22 @@ async function register(req, res) {
     const exists = await client.query('SELECT id FROM users WHERE email = $1', [email]);
     if (exists.rows.length) {
       await client.query('ROLLBACK');
-      return res.status(409).json({ message: 'Email already registered' });
+      return res.status(409).json({ message: 'Email already registered. Please log in or use a different email.' });
+    }
+
+    // Check duplicate phone number
+    const phoneExists = await client.query('SELECT id FROM users WHERE phone = $1', [phone]);
+    if (phoneExists.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ message: 'This mobile number is already linked to an existing account. Please log in instead.' });
+    }
+
+    // Check duplicate NIC via hash (AES-encrypted value uses random IV so can't be queried directly)
+    const nicHash = hashNIC(nic);
+    const nicExists = await client.query('SELECT id FROM users WHERE nic_hash = $1', [nicHash]).catch(() => ({ rows: [] }));
+    if (nicExists.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ message: 'This NIC is already linked to an existing account. Please log in instead.' });
     }
 
     const password_hash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 12);
@@ -98,10 +119,10 @@ async function register(req, res) {
     const status = role === 'lawyer' ? 'pending' : 'active';
 
     const result = await client.query(
-      `INSERT INTO users (full_name, email, password_hash, phone, role, status, nic_encrypted)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO users (full_name, email, password_hash, phone, role, status, nic_encrypted, nic_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id, full_name, email, role, status, created_at`,
-      [full_name, email, password_hash, phone, role, status, nic_encrypted]
+      [full_name, email, password_hash, phone, role, status, nic_encrypted, nicHash]
     );
     const user = result.rows[0];
 
@@ -300,4 +321,23 @@ async function me(req, res) {
   }
 }
 
-module.exports = { register, registerValidation, login, loginValidation, me, sendOtp, sendOtpValidation, verifyOtp, verifyOtpValidation };
+// ── CHECK PHONE (pre-registration) ───────────────────────────
+async function checkPhone(req, res) {
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ message: 'Phone is required' });
+  const normalized = normalizePhone(phone);
+  try {
+    const result = await pool.query(
+      'SELECT id FROM users WHERE phone = $1',
+      [normalized]
+    );
+    if (result.rows.length > 0) {
+      return res.json({ available: false, message: 'This mobile number is already registered.' });
+    }
+    res.json({ available: true, message: 'Phone number is available.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not check phone' });
+  }
+}
+
+module.exports = { register, registerValidation, login, loginValidation, me, sendOtp, sendOtpValidation, verifyOtp, verifyOtpValidation, checkPhone };

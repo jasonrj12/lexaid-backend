@@ -6,9 +6,13 @@ const {
   me,
   sendOtp, sendOtpValidation,
   verifyOtp, verifyOtpValidation,
+  checkPhone,
 } = require('../controllers/authController');
 const { authenticate } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+
+// POST /api/auth/check-phone — check if a phone number is already registered
+router.post('/check-phone', checkPhone);
 
 // POST /api/auth/send-otp  — generates & sends a 6-digit OTP via SMS
 router.post('/send-otp', sendOtpValidation, sendOtp);

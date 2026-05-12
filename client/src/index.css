@@ -157,6 +157,7 @@
   .badge-progress  { background: rgba(252,163,17,0.20); color: #fbbf24; border: 1px solid rgba(252,163,17,0.40); }
   .badge-resolved  { background: rgba(34,197,94,0.15);  color: #86efac; border: 1px solid rgba(34,197,94,0.30); }
   .badge-closed    { background: rgba(107,114,128,0.15); color: #9ca3af; border: 1px solid rgba(107,114,128,0.30); }
+  .badge-danger    { background: rgba(239,68,68,0.15);   color: #fca5a5; border: 1px solid rgba(239,68,68,0.30); }
 
   /* ── Sidebar nav ── */
   .nav-item {
@@ -268,4 +269,23 @@
 @keyframes pulse-slow {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 0.15; }
+}
+
+/* ─── Entry Animations ────────────────────────────────────────────── */
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out both;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.35s ease-out both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

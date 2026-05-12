@@ -2,7 +2,7 @@ import { Link, useNavigate, NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   Scale, LayoutDashboard, Users, FolderOpen, BookOpen,
-  BarChart3, Settings, LogOut, X, BadgeCheck
+  BarChart3, LogOut, X, BadgeCheck, Gavel
 } from 'lucide-react';
 
 export default function AdminSidebar({ mobile = false, onClose }) {
@@ -10,13 +10,13 @@ export default function AdminSidebar({ mobile = false, onClose }) {
   const navigate = useNavigate();
 
   const NAV = [
-    { to: '/admin',          icon: LayoutDashboard, label: 'Overview',       exact: true },
-    { to: '/admin/lawyers',  icon: BadgeCheck,      label: 'Lawyer Verif.' },
-    { to: '/admin/cases',    icon: FolderOpen,      label: 'All Cases' },
-    { to: '/admin/users',    icon: Users,           label: 'Users' },
-    { to: '/admin/library',  icon: BookOpen,        label: 'Library Queue' },
-    { to: '/admin/reports',  icon: BarChart3,       label: 'Reports' },
-    { to: '/admin/settings', icon: Settings,        label: 'Settings' },
+    { to: '/admin',                   icon: LayoutDashboard, label: 'Overview',           exact: true },
+    { to: '/admin/lawyers',           icon: BadgeCheck,      label: 'Lawyer Verif.' },
+    { to: '/admin/lawyers-directory', icon: Gavel,           label: 'Lawyers Directory' },
+    { to: '/admin/cases',             icon: FolderOpen,      label: 'All Cases' },
+    { to: '/admin/users',             icon: Users,           label: 'Users' },
+    { to: '/admin/library',           icon: BookOpen,        label: 'Library Queue' },
+    { to: '/admin/reports',           icon: BarChart3,       label: 'Reports' },
   ];
 
   const handleLogout = () => { logout(); navigate('/'); };

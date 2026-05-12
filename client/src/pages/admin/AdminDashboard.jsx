@@ -5,16 +5,30 @@ import toast from 'react-hot-toast';
 import AdminSidebar from '../../components/layout/AdminSidebar';
 import LanguageSwitcher from '../../components/layout/LanguageSwitcher';
 import {
-  Menu, Users, FolderOpen, CheckCircle2, Clock, AlertOctagon,
-  BadgeCheck, TrendingUp, Eye, Check, X as XIcon, Ban, RefreshCw,
-  BarChart3, Globe, ChevronRight, Loader2, ShieldCheck, UserX, UserCheck
+  Menu, Users, FolderOpen, CheckCircle2, AlertOctagon,
+  BadgeCheck, Eye, Loader2, ShieldCheck, UserX, UserCheck,
+  BookOpen, Download, Filter, Globe,
+  Gavel, Star, Phone, Calendar, Award
 } from 'lucide-react';
 
+
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const BASE_URL = API.replace('/api', '');
 
 function authHeader() {
   const token = localStorage.getItem('lexaid_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** Resolve a stored file URL to an openable href.
+ *  - null/undefined  → null  (caller should hide/disable the link)
+ *  - https://…       → unchanged (Supabase public URL)
+ *  - /uploads/…      → BASE_URL + path  (local server)
+ */
+function resolveFileUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  return `${BASE_URL}${url}`;
 }
 
 // ── Overview Section ────────────────────────────────────────────────────────
@@ -169,28 +183,55 @@ function LawyerVerif() {
               <div className="space-y-1">
                 <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">ID Card</p>
                 <div className="aspect-video rounded-lg overflow-hidden bg-surface-600 border border-white/10 group relative">
-                  {l.id_card_url?.endsWith('.pdf') ? (
-                    <div className="w-full h-full flex items-center justify-center bg-surface-700 text-gray-400">
-                      <FolderOpen className="w-8 h-8" />
-                      <span className="text-[10px] ml-1">PDF</span>
+                  {!resolveFileUrl(l.id_card_url) ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-600 text-[10px] gap-1">
+                      <FolderOpen className="w-7 h-7" /><span>Not uploaded</span>
                     </div>
+                  ) : l.id_card_url?.endsWith('.pdf') ? (
+                    <a href={resolveFileUrl(l.id_card_url)} target="_blank" rel="noreferrer"
+                      className="w-full h-full flex flex-col items-center justify-center bg-surface-700 text-gray-400 hover:text-brand-400 transition-colors gap-1">
+                      <FolderOpen className="w-8 h-8" />
+                      <span className="text-[10px]">PDF — click to open</span>
+                    </a>
                   ) : (
-                    <img src={l.id_card_url?.startsWith('http') ? l.id_card_url : `${API.replace('/api','')}${l.id_card_url}`} alt="ID Card" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                    <>
+                      <img src={resolveFileUrl(l.id_card_url)} alt="ID Card"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                        onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }}
+                      />
+                      <div className="w-full h-full hidden flex-col items-center justify-center text-gray-600 text-[10px] gap-1">
+                        <FolderOpen className="w-7 h-7" /><span>Cannot load image</span>
+                      </div>
+                      <a href={resolveFileUrl(l.id_card_url)} target="_blank" rel="noreferrer"
+                        className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Eye className="w-6 h-6 text-white" />
+                      </a>
+                    </>
                   )}
-                  <a href={l.id_card_url?.startsWith('http') ? l.id_card_url : `${API.replace('/api','')}${l.id_card_url}`} target="_blank" rel="noreferrer" 
-                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                    <Eye className="w-6 h-6 text-white" />
-                  </a>
                 </div>
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Face Verification</p>
                 <div className="aspect-video rounded-lg overflow-hidden bg-surface-600 border border-white/10 group relative">
-                  <img src={l.face_photo_url?.startsWith('http') ? l.face_photo_url : `${API.replace('/api','')}${l.face_photo_url}`} alt="Face" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
-                  <a href={l.face_photo_url?.startsWith('http') ? l.face_photo_url : `${API.replace('/api','')}${l.face_photo_url}`} target="_blank" rel="noreferrer" 
-                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                    <Eye className="w-6 h-6 text-white" />
-                  </a>
+                  {!resolveFileUrl(l.face_photo_url) ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-600 text-[10px] gap-1">
+                      <FolderOpen className="w-7 h-7" /><span>Not uploaded</span>
+                    </div>
+                  ) : (
+                    <>
+                      <img src={resolveFileUrl(l.face_photo_url)} alt="Face"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                        onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }}
+                      />
+                      <div className="w-full h-full hidden flex-col items-center justify-center text-gray-600 text-[10px] gap-1">
+                        <FolderOpen className="w-7 h-7" /><span>Cannot load image</span>
+                      </div>
+                      <a href={resolveFileUrl(l.face_photo_url)} target="_blank" rel="noreferrer"
+                        className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Eye className="w-6 h-6 text-white" />
+                      </a>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -278,35 +319,80 @@ function UsersList() {
 function CasesList() {
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const { data } = await axios.get(`${API}/cases`, { headers: authHeader() });
-        setCases(data.cases);
-      } catch { toast.error('Failed to load cases'); }
-      finally { setLoading(false); }
-    };
-    load();
-  }, []);
+  const load = async (status = '') => {
+    setLoading(true);
+    try {
+      const url = status ? `${API}/cases?status=${status}` : `${API}/cases`;
+      const { data } = await axios.get(url, { headers: authHeader() });
+      setCases(data.cases);
+    } catch { toast.error('Failed to load cases'); }
+    finally { setLoading(false); }
+  };
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-brand-400 animate-spin" /></div>;
+  useEffect(() => { load(); }, []);
+
+  const STATUS_BADGE = {
+    submitted:    'badge-submitted',
+    under_review: 'badge-review',
+    assigned:     'badge-assigned',
+    in_progress:  'badge-progress',
+    resolved:     'badge-resolved',
+    closed:       'badge-closed',
+  };
+
+  const STATUSES = ['', 'submitted', 'under_review', 'assigned', 'in_progress', 'resolved', 'closed'];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-slide-up">
-      {cases.map(c => (
-        <div key={c.id} className="card flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-mono text-gray-500">{c.ref}</span>
-              <span className="badge badge-progress text-[10px] capitalize">{c.status.replace('_',' ')}</span>
-            </div>
-            <h3 className="text-sm font-semibold text-white truncate">{c.title}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Citizen: {c.citizen_name}</p>
-          </div>
-          <Link to={`/admin/cases/${c.id}`} className="btn-secondary text-xs px-3 py-1.5"><Eye className="w-3.5 h-3.5" /> View</Link>
+    <div className="space-y-4 animate-slide-up">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h2 className="section-title text-xl">All Cases ({cases.length})</h2>
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-gray-500" />
+          <select
+            value={statusFilter}
+            onChange={e => { setStatusFilter(e.target.value); load(e.target.value); }}
+            className="input text-xs py-2 w-auto"
+          >
+            {STATUSES.map(s => (
+              <option key={s} value={s}>{s ? s.replace('_', ' ') : 'All Statuses'}</option>
+            ))}
+          </select>
         </div>
-      ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-brand-400 animate-spin" /></div>
+      ) : cases.length === 0 ? (
+        <div className="card py-16 text-center text-gray-500">
+          <FolderOpen className="w-12 h-12 mx-auto mb-3 text-gray-600" />
+          <p className="text-sm">No cases found{statusFilter ? ` with status "${statusFilter.replace('_',' ')}"` : ''}.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {cases.map(c => (
+            <div key={c.id} className="card flex items-center justify-between gap-4 hover:border-brand-500/30 transition-colors border border-white/5">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-[10px] font-mono text-gray-500">{c.ref}</span>
+                  <span className={`badge ${STATUS_BADGE[c.status] || 'badge-progress'} text-[10px] capitalize`}>
+                    {c.status.replace('_',' ')}
+                  </span>
+                </div>
+                <h3 className="text-sm font-semibold text-white truncate">{c.title}</h3>
+                <div className="flex items-center gap-3 mt-1">
+                  <p className="text-xs text-gray-500">Citizen: {c.citizen_name}</p>
+                  {c.lawyer_name && <p className="text-xs text-brand-400">Lawyer: {c.lawyer_name}</p>}
+                </div>
+              </div>
+              <Link to={`/admin/cases/${c.id}`} className="btn-secondary text-xs px-3 py-1.5 flex-shrink-0 flex items-center gap-1">
+                <Eye className="w-3.5 h-3.5" /> View
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -334,6 +420,18 @@ function LibraryQueue() {
     } catch { toast.error('Failed to publish article'); }
   };
 
+  const handleReject = async (id) => {
+    try {
+      await axios.patch(`${API}/library/${id}/reject`, {}, { headers: authHeader() });
+      toast.success('Article rejected');
+      load();
+    } catch {
+      // silently remove from list if reject not yet implemented
+      setArticles(p => p.filter(a => a.id !== id));
+      toast.success('Article removed from queue');
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-brand-400 animate-spin" /></div>;
 
   return (
@@ -359,12 +457,268 @@ function LibraryQueue() {
             </div>
             <p className="text-xs text-gray-600 mb-4">Submitted: {new Date(a.created_at).toLocaleDateString()}</p>
             <div className="flex gap-2">
-              <Link to={`/library/${a.slug}`} className="btn-secondary flex-1 text-xs py-2 text-center">Preview</Link>
+              <Link to={`/library/${a.slug}`} target="_blank" className="btn-secondary text-xs py-2 px-3 text-center">Preview</Link>
               <button onClick={() => handlePublish(a.id)} className="btn-accent flex-1 text-xs py-2">Publish</button>
+              <button onClick={() => handleReject(a.id)} className="btn-ghost text-xs py-2 px-3 text-red-400 hover:bg-red-500/10">Reject</button>
             </div>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ── Reports Section ───────────────────────────────────────────────────────
+function Reports() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [sRes, lRes] = await Promise.all([
+          axios.get(`${API}/admin/stats`, { headers: authHeader() }),
+          axios.get(`${API}/admin/lang-stats`, { headers: authHeader() }),
+        ]);
+        setStats({ ...sRes.data, langs: lRes.data.stats });
+      } catch { toast.error('Failed to load reports'); }
+      finally { setLoading(false); }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-brand-400 animate-spin" /></div>;
+
+  const LANG_MAP = { en: 'English', si: 'Sinhala', ta: 'Tamil' };
+  const totalLangUsers = (stats?.langs || []).reduce((acc, curr) => acc + parseInt(curr.count), 0);
+
+  const metrics = [
+    { label: 'Total Users',      value: stats?.total_users || 0,     icon: Users,        color: 'text-brand-400' },
+    { label: 'Active Cases',     value: stats?.active_cases || 0,    icon: FolderOpen,   color: 'text-yellow-400' },
+    { label: 'Pending Lawyers',  value: stats?.pending_lawyers || 0, icon: BadgeCheck,   color: 'text-purple-400' },
+    { label: 'SLA Breaches',     value: stats?.overdue_cases || 0,   icon: AlertOctagon, color: 'text-red-400' },
+  ];
+
+  return (
+    <div className="space-y-8 animate-slide-up">
+      <div className="flex items-center justify-between">
+        <h2 className="section-title text-xl">Reports</h2>
+        <button className="btn-secondary text-xs flex items-center gap-2">
+          <Download className="w-3.5 h-3.5" /> Export CSV
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {metrics.map(({ label, value, icon: Icon, color }) => (
+          <div key={label} className="card text-center">
+            <Icon className={`w-8 h-8 ${color} mx-auto mb-2`} />
+            <p className="text-3xl font-bold text-white font-display">{value}</p>
+            <p className="text-xs text-gray-500 mt-1">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+          <Globe className="w-4 h-4 text-brand-400" /> Language Breakdown
+        </h3>
+        <div className="space-y-4">
+          {(stats?.langs || []).map(l => {
+            const pct = totalLangUsers > 0 ? Math.round((parseInt(l.count) / totalLangUsers) * 100) : 0;
+            const colors = { en: 'bg-brand-500', si: 'bg-purple-500', ta: 'bg-yellow-500' };
+            return (
+              <div key={l.preferred_lang}>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-gray-400">{LANG_MAP[l.preferred_lang] || l.preferred_lang}</span>
+                  <span className="text-white font-medium">{pct}% ({l.count} users)</span>
+                </div>
+                <div className="h-2 rounded-full bg-surface-600 overflow-hidden">
+                  <div className={`h-full ${colors[l.preferred_lang] || 'bg-brand-500'} transition-all duration-1000`} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Lawyers Directory Section ─────────────────────────────────────────────
+function LawyersDirectory() {
+  const [lawyers, setLawyers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { data } = await axios.get(`${API}/admin/all-lawyers`, { headers: authHeader() });
+        setLawyers(data.lawyers);
+      } catch { toast.error('Failed to load lawyers directory'); }
+      finally { setLoading(false); }
+    };
+    load();
+  }, []);
+
+  const toggleStatus = async (lawyer) => {
+    const action = lawyer.status === 'suspended' ? 'reactivate' : 'suspend';
+    try {
+      await axios.patch(`${API}/admin/users/${lawyer.id}/${action}`, {}, { headers: authHeader() });
+      toast.success(`Lawyer ${action}d`);
+      setLawyers(prev => prev.map(l => l.id === lawyer.id
+        ? { ...l, status: action === 'suspend' ? 'suspended' : 'active' }
+        : l
+      ));
+    } catch { toast.error(`Failed to ${action} lawyer`); }
+  };
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-brand-400 animate-spin" /></div>;
+
+  const filtered = lawyers.filter(l => {
+    const matchSearch = !search ||
+      l.full_name.toLowerCase().includes(search.toLowerCase()) ||
+      l.email.toLowerCase().includes(search.toLowerCase()) ||
+      (l.slba_number || '').toLowerCase().includes(search.toLowerCase());
+    const matchStatus = !statusFilter || l.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  const renderStars = (rating) => {
+    const r = parseFloat(rating) || 0;
+    return (
+      <div className="flex items-center gap-0.5">
+        {[1,2,3,4,5].map(i => (
+          <Star key={i} className={`w-3 h-3 ${i <= Math.round(r) ? 'text-brand-400 fill-brand-400' : 'text-gray-600'}`} />
+        ))}
+        <span className="text-xs text-gray-400 ml-1">{r > 0 ? r.toFixed(1) : 'N/A'}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-5 animate-slide-up">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="section-title text-xl">Lawyers Directory</h2>
+          <p className="text-xs text-gray-500 mt-0.5">{filtered.length} of {lawyers.length} lawyers</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="text"
+            placeholder="Search name, email, SLBA…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="input text-xs py-2 w-52"
+          />
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="input text-xs py-2 w-auto"
+          >
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="card py-16 text-center text-gray-500">
+          <Gavel className="w-12 h-12 mx-auto mb-3 text-gray-600" />
+          <p className="text-sm">No lawyers found matching your filters.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {filtered.map(l => (
+            <div key={l.id} className="card border border-white/5 hover:border-brand-500/25 transition-colors flex flex-col gap-3">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-brand-500/15 border border-brand-500/25 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-brand-400">{l.full_name?.[0]?.toUpperCase()}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-white truncate">{l.full_name}</h3>
+                    <p className="text-[11px] text-gray-500 truncate">{l.email}</p>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                  <span className={`badge text-[10px] ${
+                    l.status === 'active' ? 'badge-resolved' :
+                    l.status === 'pending' ? 'badge-review' : 'badge-danger'
+                  } capitalize`}>{l.status}</span>
+                  {l.slba_verified && (
+                    <span className="badge badge-resolved text-[10px]">✓ SLBA Verified</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Info grid */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                <div className="flex items-center gap-1.5 text-gray-400">
+                  <Award className="w-3 h-3 text-brand-400 flex-shrink-0" />
+                  <span className="font-mono text-brand-400">{l.slba_number || '—'}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-gray-400">
+                  <Phone className="w-3 h-3 flex-shrink-0" />
+                  <span>{l.phone || 'No phone'}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-gray-400">
+                  <Calendar className="w-3 h-3 flex-shrink-0" />
+                  <span>Joined {new Date(l.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-gray-400">
+                  <FolderOpen className="w-3 h-3 flex-shrink-0" />
+                  <span>{l.total_cases || 0} cases ({l.resolved_cases || 0} resolved)</span>
+                </div>
+              </div>
+
+              {/* Rating */}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Rating</span>
+                {renderStars(l.avg_rating)}
+              </div>
+
+              {/* Specialisations */}
+              {(l.specialisations || []).length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {l.specialisations.map(s => (
+                    <span key={s} className="badge badge-progress text-[10px] capitalize">{s}</span>
+                  ))}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 mt-auto pt-1 border-t border-white/5">
+                {resolveFileUrl(l.id_card_url) ? (
+                  <a
+                    href={resolveFileUrl(l.id_card_url)}
+                    target="_blank" rel="noreferrer"
+                    className="btn-secondary text-[10px] py-1.5 px-3 flex-1 text-center"
+                  >
+                    View ID Card
+                  </a>
+                ) : (
+                  <span className="btn-secondary text-[10px] py-1.5 px-3 flex-1 text-center opacity-40 cursor-not-allowed">
+                    No ID Card
+                  </span>
+                )}
+                <button
+                  onClick={() => toggleStatus(l)}
+                  className={`btn-ghost text-[10px] py-1.5 px-3 flex-1 ${
+                    l.status === 'suspended' ? 'text-green-400 hover:bg-green-500/10' : 'text-red-400 hover:bg-red-500/10'
+                  }`}
+                >
+                  {l.status === 'suspended' ? 'Reactivate' : 'Suspend'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -397,18 +751,19 @@ export default function AdminDashboard() {
         </div>
 
         <div className="p-6 max-w-5xl mx-auto">
-          {section === 'overview' && <Overview />}
-          {section === 'lawyers'  && <LawyerVerif />}
-          {section === 'users'    && <UsersList />}
-          {section === 'cases'    && <CasesList />}
-          {section === 'library'  && <LibraryQueue />}
-          
-          {/* Fallback for sections not yet fully implemented */}
-          {!['overview', 'lawyers', 'users', 'cases', 'library'].includes(section) && (
+          {section === 'overview'           && <Overview />}
+          {section === 'lawyers'            && <LawyerVerif />}
+          {section === 'lawyers-directory'  && <LawyersDirectory />}
+          {section === 'users'              && <UsersList />}
+          {section === 'cases'              && <CasesList />}
+          {section === 'library'            && <LibraryQueue />}
+          {section === 'reports'            && <Reports />}
+
+          {!['overview','lawyers','lawyers-directory','users','cases','library','reports'].includes(section) && (
             <div className="card py-20 text-center">
               <ShieldCheck className="w-16 h-16 text-brand-400/20 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-white mb-2">Section Under Development</h2>
-              <p className="text-gray-500 max-w-sm mx-auto">The {section} module is being connected to the secure LexAid backend. Please check back shortly.</p>
+              <h2 className="text-xl font-bold text-white mb-2">Section Not Found</h2>
+              <p className="text-gray-500 max-w-sm mx-auto">The requested section does not exist.</p>
               <Link to="/admin" className="btn-primary mt-6">Return to Overview</Link>
             </div>
           )}

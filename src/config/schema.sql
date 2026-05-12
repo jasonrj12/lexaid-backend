@@ -33,6 +33,9 @@ CREATE TABLE users (
   status        user_status NOT NULL DEFAULT 'active',
   -- PII stored encrypted (AES-256 applied at application layer)
   nic_encrypted VARCHAR(500),
+  -- Deterministic SHA-256 hash of normalised NIC for uniqueness detection
+  -- (AES-CBC uses random IV so encrypted values can't be queried directly)
+  nic_hash      VARCHAR(64),
   preferred_lang CHAR(2) NOT NULL DEFAULT 'en' CHECK (preferred_lang IN ('en','si','ta')),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -177,6 +180,10 @@ CREATE INDEX idx_audit_actor       ON audit_log(actor_id);
 CREATE INDEX idx_audit_target      ON audit_log(target_type, target_id);
 CREATE INDEX idx_articles_status   ON library_articles(status);
 CREATE INDEX idx_articles_category ON library_articles(category);
+-- Uniqueness for NIC deduplication (partial — only non-null values)
+CREATE UNIQUE INDEX idx_users_nic_hash    ON users(nic_hash) WHERE nic_hash IS NOT NULL;
+-- Uniqueness for phone deduplication (partial — only non-null values)
+CREATE UNIQUE INDEX idx_users_phone_unique ON users(phone)  WHERE phone IS NOT NULL;
 
 -- ──────────────────────────────────────────────────────────────
 -- AUTO-UPDATE updated_at trigger

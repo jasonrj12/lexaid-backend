@@ -168,7 +168,7 @@ router.get('/lang-stats', authenticate, authorize('admin'), async (req, res) => 
   }
 });
 
-// GET /api/admin/active-lawyers
+// GET /api/admin/active-lawyers (used by case assignment dropdown)
 router.get('/active-lawyers', authenticate, authorize('admin'), async (req, res) => {
   try {
     const result = await pool.query(
@@ -181,6 +181,28 @@ router.get('/active-lawyers', authenticate, authorize('admin'), async (req, res)
     res.json({ lawyers: result.rows });
   } catch (err) {
     res.status(500).json({ message: 'Could not fetch active lawyers' });
+  }
+});
+
+// GET /api/admin/all-lawyers (full lawyer directory with stats)
+router.get('/all-lawyers', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.full_name, u.email, u.phone, u.status, u.created_at,
+              lp.slba_number, lp.specialisations, lp.slba_verified, lp.is_face_verified,
+              lp.avg_rating, lp.id_card_url, lp.face_photo_url,
+              COUNT(c.id) FILTER (WHERE c.lawyer_id = u.id) AS total_cases,
+              COUNT(c.id) FILTER (WHERE c.lawyer_id = u.id AND c.status IN ('resolved','closed')) AS resolved_cases
+       FROM users u
+       JOIN lawyer_profiles lp ON lp.user_id = u.id
+       LEFT JOIN cases c ON c.lawyer_id = u.id
+       WHERE u.role = 'lawyer'
+       GROUP BY u.id, lp.id
+       ORDER BY u.created_at DESC`
+    );
+    res.json({ lawyers: result.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not fetch lawyers' });
   }
 });
 

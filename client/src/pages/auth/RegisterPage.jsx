@@ -36,6 +36,8 @@ export default function RegisterPage() {
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpCode, setOtpCode] = useState('');
+  // Phone availability check
+  const [phoneStatus, setPhoneStatus] = useState('idle'); // 'idle' | 'checking' | 'available' | 'taken'
 
   // Camera State
   const [cameraActive, setCameraActive] = useState(false);
@@ -93,9 +95,32 @@ export default function RegisterPage() {
 
   const handleSendOtp = async () => {
     let phoneVal = watch('phone');
-    if (!phoneVal) return;
-    if (phoneVal.startsWith('0')) phoneVal = phoneVal.slice(1);
+    if (!phoneVal || phoneVal.length < 9) {
+      toast.error('Please enter a valid phone number');
+      return;
+    }
     
+    if (phoneVal.startsWith('0')) phoneVal = phoneVal.slice(1);
+
+    // If not checked yet, check now
+    if (phoneStatus === 'idle') {
+      setPhoneStatus('checking');
+      try {
+        const { data } = await axios.post('/auth/check-phone', { phone: '0' + phoneVal });
+        if (!data.available) {
+          setPhoneStatus('taken');
+          return;
+        }
+        setPhoneStatus('available');
+      } catch {
+        setPhoneStatus('idle');
+        toast.error('Could not verify phone availability. Please try again.');
+        return;
+      }
+    }
+
+    if (phoneStatus === 'taken') return;
+
     setOtpLoading(true);
     try {
       const { data } = await axios.post('/auth/send-otp', { phone: '0' + phoneVal });
@@ -111,10 +136,44 @@ export default function RegisterPage() {
     }
   };
 
+  const handleCheckPhone = async (val) => {
+    let phoneVal = val || watch('phone');
+    if (!phoneVal || phoneVal.length < 9) {
+      setPhoneStatus('idle');
+      return;
+    }
+    if (phoneVal.startsWith('0')) phoneVal = phoneVal.slice(1);
+    setPhoneStatus('checking');
+    try {
+      const { data } = await axios.post('/auth/check-phone', { phone: '0' + phoneVal });
+      setPhoneStatus(data.available ? 'available' : 'taken');
+    } catch {
+      setPhoneStatus('idle');
+    }
+  };
+
+  const phoneValue = watch('phone');
+
+  // Automatic Check on Type (Debounced)
+  useEffect(() => {
+    if (!phoneValue || phoneValue.length < 9) {
+      setPhoneStatus('idle');
+      return;
+    }
+    
+    setOtpSent(false); // Reset OTP if phone changes
+    
+    const timer = setTimeout(() => {
+      handleCheckPhone(phoneValue);
+    }, 600); // Wait 600ms after last type
+
+    return () => clearTimeout(timer);
+  }, [phoneValue]);
+
   const handleVerifyOtp = async () => {
     let phoneVal = watch('phone');
     if (phoneVal.startsWith('0')) phoneVal = phoneVal.slice(1);
-    
+
     setOtpLoading(true);
     try {
       await axios.post('/auth/verify-otp', { phone: '0' + phoneVal, otp: otpCode });
@@ -200,7 +259,28 @@ export default function RegisterPage() {
         navigate(user.role === 'lawyer' ? '/lawyer' : '/citizen', { replace: true });
       }
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Registration failed. Please try again.');
+      const msg = err?.response?.data?.message || 'Registration failed. Please try again.';
+      const isDuplicate = err?.response?.status === 409;
+
+      if (isDuplicate) {
+        // Show error with a login shortcut
+        toast.error(
+          (t) => (
+            <div>
+              <p className="text-sm font-semibold">{msg}</p>
+              <button
+                onClick={() => { toast.dismiss(t.id); navigate('/login'); }}
+                className="mt-2 text-xs font-bold underline text-amber-400 hover:text-amber-300"
+              >
+                Go to Login →
+              </button>
+            </div>
+          ),
+          { duration: 8000, icon: '🔑' }
+        );
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -329,41 +409,94 @@ export default function RegisterPage() {
                     <Phone className="w-3.5 h-3.5 inline mr-2 text-brand-400" />
                     Mobile Number
                   </label>
+
+                  {/* Phone input row */}
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">+94</span>
-                      <input type="tel" className={`input pl-12 ${errors.phone ? 'input-error' : ''}`}
+                      <input
+                        type="tel"
+                        className={`input pl-12 pr-10 ${
+                          errors.phone ? 'input-error' :
+                          phoneStatus === 'taken' ? 'input-error' :
+                          phoneStatus === 'available' ? 'border-green-500/60' : ''
+                        }`}
                         placeholder="077 123 4567"
                         maxLength={10}
                         {...register('phone', {
-                          required: "Phone is required",
-                          pattern: { value: /^\d{9,10}$/, message: "Invalid phone number" }
+                          required: 'Phone is required',
+                          pattern: { value: /^\d{9,10}$/, message: 'Invalid phone number' },
                         })}
-                        disabled={otpVerified || otpSent} />
+                        disabled={otpVerified}
+                      />
+                      {/* Status icon inside input */}
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm">
+                        {phoneStatus === 'checking' && <RefreshCw className="w-3.5 h-3.5 text-gray-400 animate-spin" />}
+                        {phoneStatus === 'available' && <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />}
+                        {phoneStatus === 'taken'     && <span className="text-red-400 text-xs font-bold">✕</span>}
+                      </span>
                     </div>
+
+                    {/* Send OTP button — hidden once verified */}
                     {!otpVerified && (
-                      <button type="button" onClick={handleSendOtp}
-                        disabled={otpLoading || !watch('phone') || otpSent}
-                        className="btn-ghost text-brand-400 border border-brand-500/20 px-4 rounded-xl text-xs">
-                        {otpLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : otpSent ? 'Resend' : 'Send OTP'}
+                      <button
+                        type="button"
+                        onClick={handleSendOtp}
+                        disabled={otpLoading || !watch('phone') || otpSent || phoneStatus === 'taken' || phoneStatus === 'checking'}
+                        className="btn-ghost text-brand-400 border border-brand-500/20 px-4 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {otpLoading
+                          ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          : phoneStatus === 'checking' ? 'Checking…'
+                          : otpSent ? 'Resend'
+                          : 'Send OTP'}
                       </button>
                     )}
                   </div>
+
                   {errors.phone && <p className="field-error">{errors.phone.message}</p>}
+
+                  {/* Phone status messages */}
+                  {phoneStatus === 'available' && !otpSent && (
+                    <p className="text-xs text-green-400 flex items-center gap-1 mt-1">
+                      <CheckCircle2 className="w-3 h-3" /> Number available — tap Send OTP to continue
+                    </p>
+                  )}
+                  {phoneStatus === 'taken' && (
+                    <div className="mt-2 p-3 rounded-xl bg-red-500/8 border border-red-500/25 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-red-400">📵 Already registered</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">This number is linked to an existing account.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/login')}
+                        className="text-[10px] font-bold text-brand-400 hover:text-brand-300 underline flex-shrink-0 mt-0.5"
+                      >
+                        Log in →
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {otpSent && !otpVerified && (
                   <div className="form-group animate-in fade-in zoom-in-95">
                     <label className="label">Verification Code</label>
                     <div className="flex gap-2">
-                      <input type="text" placeholder="6-digit code"
+                      <input
+                        type="text"
+                        placeholder="6-digit code"
                         className="input flex-1 text-center tracking-widest font-mono text-lg"
                         maxLength={6}
                         value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))} />
-                      <button type="button" onClick={handleVerifyOtp}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyOtp}
                         disabled={otpLoading || otpCode.length !== 6}
-                        className="btn-primary px-6">
+                        className="btn-primary px-6"
+                      >
                         {otpLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Verify'}
                       </button>
                     </div>
